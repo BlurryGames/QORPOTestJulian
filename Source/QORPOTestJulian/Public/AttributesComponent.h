@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+
 #include "AttributesComponent.generated.h"
 
 
@@ -13,19 +14,18 @@ class QORPOTESTJULIAN_API UAttributesComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:	
-	UAttributesComponent();
-
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnHealthChanged OnHealthChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "Attributes")
-	void HealthReaction(const float Amount, bool bDamage = true);
+	bool HealthReaction(const float Amount);
 
 protected:
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attributes", meta = (ClampMin = 1.0f, ClampMax = 1000.0f))
 	float MaxHealth = 100.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Attributes", meta = (ClampMin = 1.0f, ClampMax = 1000.0f))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes", meta = (ClampMin = 1.0f, ClampMax = 1000.0f))
 	float CurrentHealth = MaxHealth;
+
+	virtual void BeginPlay() override;
 };

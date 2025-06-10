@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "HealEvent.h"
 #include "ShooterPlayerController.h"
 #include "AttributesComponent.h"
 
@@ -27,20 +29,29 @@ public:
 
 	AShooterPlayer();
 
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Interction")
+	void AddAmmunition(const int Amount);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAttributesComponent* AttributesComponent = nullptr;
+	USceneComponent* WeaponSocketComponent = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USceneComponent* WeaponSocketComponent = nullptr;
+	UAttributesComponent* AttributesComponent = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats|Equipment")
 	ABaseWeapon* CurrentWeapon = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats|Movement")
 	FVector MovementDirection = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FHitResult LineTraceHitInteraction = FHitResult();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction", meta = (ClampMin = 0.0f, ClampMax = 1000.0f))
+	float InteractionRange = 200.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats|Movement")
 	float DefaultSpeed = 0.0f;
@@ -50,6 +61,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Equipment", meta = (ClampMin = 0, ClampMax = 10000))
 	int Ammunition = 120;
+
+	FCollisionObjectQueryParams ObjectParams = FCollisionObjectQueryParams(ECC_WorldDynamic);
+
+	FCollisionQueryParams LineTraceParams = FCollisionQueryParams();
+
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	virtual void BeginPlay() override;
 
@@ -68,7 +85,7 @@ protected:
 	void EquipWeapon(ABaseWeapon* Weapon);
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void ReloadSpent(int Amount);
+	void ReloadSpent(const int Amount);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void UnequipWeapon();
@@ -105,4 +122,7 @@ protected:
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void HandleReload();
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void HandleInteraction();
 };

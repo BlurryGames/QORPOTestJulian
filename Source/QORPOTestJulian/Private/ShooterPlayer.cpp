@@ -1,7 +1,8 @@
 #include "ShooterPlayer.h"
 #include "BaseWeapon.h"
+#include "Door.h"
 
-AShooterPlayer::AShooterPlayer()
+AShooterPlayer::AShooterPlayer() : Super()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bUseControllerRotationYaw = true;
@@ -12,8 +13,64 @@ AShooterPlayer::AShooterPlayer()
 	MovementComponent.GetNavAgentPropertiesRef().bCanCrouch = true;
 
 	WeaponSocketComponent = CreateDefaultSubobject<USceneComponent>(FName("WeaponSocketComponent"));
-	WeaponSocketComponent->SetupAttachment(RootComponent);
+	WeaponSocketComponent->SetupAttachment(GetRootComponent());
+
 	AttributesComponent = CreateDefaultSubobject<UAttributesComponent>(FName("AttributesComponent"));
+
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+	LineTraceParams.AddIgnoredActor(this);
+}
+
+float AShooterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	float DamageResult = -1.0f;
+	if (!IsValid(AttributesComponent))
+	{
+		return DamageResult;
+	}
+
+	switch (DamageEvent.GetTypeID())
+	{
+	case FDamageEvent::ClassID:
+	{
+		DamageResult = -abs(DamageAmount);
+		AttributesComponent->HealthReaction(-abs(DamageAmount));
+		break;
+	}
+	case FPointDamageEvent::ClassID:
+	{
+		DamageResult = -abs(DamageAmount);
+		AttributesComponent->HealthReaction(-abs(DamageAmount));
+		break;
+	}
+	case FRadialDamageEvent::ClassID:
+	{
+		const FRadialDamageEvent& RadialEvent = static_cast<const FRadialDamageEvent&>(DamageEvent);
+		const FVector& CurrentPosition = GetActorLocation();
+		const FVector& RadialPosition = RadialEvent.Origin;
+		DamageResult = abs(RadialEvent.Params.BaseDamage * RadialEvent.Params.GetDamageScale(FVector::Distance(CurrentPosition, RadialPosition)));
+		AttributesComponent->HealthReaction(-DamageResult);
+		UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+		if (IsValid(MovementComponent))
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Black, FString::FromInt(RadialEvent.Params.GetMaxRadius()));
+			MovementComponent->AddRadialImpulse(RadialPosition, RadialEvent.Params.GetMaxRadius(), DamageResult * DamageAmount, RIF_Linear, true);
+		}
+		break;
+	}
+	case FHealEvent::ClassID:
+	{
+		const FHealEvent& HealEvent = static_cast<const FHealEvent&>(DamageEvent);
+		DamageResult = AttributesComponent->HealthReaction(abs(DamageAmount)) ? HealEvent.HealSuccess : DamageAmount;
+		break;
+	}
+	default:
+		break;
+	}
+
+	return DamageResult;
 }
 
 void AShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -32,6 +89,9 @@ void AShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &AShooterPlayer::HandleJump);
 	PlayerInputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &AShooterPlayer::HandleStartShoot);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AShooterPlayer::HandleReload);
+	PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &AShooterPlayer::HandleInteraction);
+
+	PlayerInputComponent->BindKey(EKeys::I, IE_Repeat, this, &AShooterPlayer::HandleInteraction);
 
 	PlayerInputComponent->BindKey(EKeys::W, IE_Released, this, &AShooterPlayer::HandleMoveBackward);
 	PlayerInputComponent->BindKey(EKeys::S, IE_Released, this, &AShooterPlayer::HandleMoveForward);
@@ -45,13 +105,21 @@ void AShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 void AShooterPlayer::BeginPlay()
 {
 	Super::BeginPlay();
-	AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AShooterPlayer::HandleHealthChange);
+	if (IsValid(AttributesComponent))
+	{
+		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AShooterPlayer::HandleHealthChange);
+	}
 }
 
 void AShooterPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	AddMovementInput(GetMovementDirection());
+
+	FVector PivotPosition = IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetComponentLocation() : GetActorLocation();
+	DrawDebugLine(GetWorld(), PivotPosition,
+		PivotPosition + (IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetForwardVector() : GetActorForwardVector()) * InteractionRange, 
+		FColor::Black);
 }
 
 void AShooterPlayer::NotifyActorBeginOverlap(AActor* OtherActor)
@@ -64,7 +132,10 @@ void AShooterPlayer::AddControllerPitchInput(float Value)
 {
 	const AShooterPlayerController* PlayerController = GetController<AShooterPlayerController>();
 	Super::AddControllerPitchInput(IsValid(PlayerController) && PlayerController->GetInvertPitch() ? Value : -Value);
-	WeaponSocketComponent->SetRelativeRotation(FRotator(GetControlRotation().Pitch, 0.0f, 0.0f));
+	if (IsValid(WeaponSocketComponent))
+	{
+		WeaponSocketComponent->SetRelativeRotation(FRotator(GetControlRotation().Pitch, 0.0f, 0.0f));
+	}
 }
 
 void AShooterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -74,6 +145,11 @@ void AShooterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	AttributesComponent->OnHealthChanged.RemoveDynamic(this, &AShooterPlayer::HandleHealthChange);
 }
 
+void AShooterPlayer::AddAmmunition(const int Amount)
+{
+	Ammunition = FMath::Clamp(Ammunition + abs(Amount), 0, INT_MAX);
+}
+
 FVector AShooterPlayer::GetMovementDirection() const
 {
 	return GetActorForwardVector() * MovementDirection.X + GetActorRightVector() * MovementDirection.Y;
@@ -81,19 +157,19 @@ FVector AShooterPlayer::GetMovementDirection() const
 
 void AShooterPlayer::EquipWeapon_Implementation(ABaseWeapon* Weapon)
 {
-	if (!IsValid(Weapon) || Weapon == CurrentWeapon)
+	if (IsValid(Weapon) && Weapon != CurrentWeapon)
 	{
-		return;
+		UnequipWeapon();
+		Weapon->AttachToComponent(IsValid(WeaponSocketComponent) ? WeaponSocketComponent : GetRootComponent(), 
+			FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		Weapon->Execute_OnInteract(Weapon, this);
+		Weapon->OnReloadSpent.AddUniqueDynamic(this, &AShooterPlayer::ReloadSpent);
+		CurrentWeapon = Weapon;
+		LineTraceParams.AddIgnoredActor(Weapon);
 	}
-
-	UnequipWeapon();
-	Weapon->AttachToComponent(WeaponSocketComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	Weapon->Execute_OnPickup(Weapon, this);
-	Weapon->OnReloadSpent.AddUniqueDynamic(this, &AShooterPlayer::ReloadSpent);
-	CurrentWeapon = Weapon;
 }
 
-void AShooterPlayer::ReloadSpent(int Amount)
+void AShooterPlayer::ReloadSpent(const int Amount)
 {
 	Ammunition = FMath::Max(Ammunition - abs(Amount), 0);
 }
@@ -102,15 +178,18 @@ void AShooterPlayer::UnequipWeapon_Implementation()
 {
 	if (IsValid(CurrentWeapon))
 	{
-		CurrentWeapon->Execute_OnDrop(CurrentWeapon);
+		CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		CurrentWeapon->Execute_OnInteract(CurrentWeapon, nullptr);
 		CurrentWeapon->OnReloadSpent.RemoveDynamic(this, &AShooterPlayer::ReloadSpent);
 		CurrentWeapon = nullptr;
+		LineTraceParams.ClearIgnoredSourceObjects();
+		LineTraceParams.AddIgnoredActor(this);
 	}
 }
 
-void AShooterPlayer::HandleHealthChange(const float Amount)
+void AShooterPlayer::HandleHealthChange(const float HealthResult)
 {
-	if (Amount <= 0.0f)
+	if (HealthResult <= 0.0f)
 	{
 		Destroy();
 	}
@@ -165,4 +244,24 @@ void AShooterPlayer::HandleStopShoot()
 void AShooterPlayer::HandleReload()
 {
 	OnReloaded.Broadcast(Ammunition);
+}
+
+void AShooterPlayer::HandleInteraction()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	FVector PivotPosition = IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetComponentLocation() : GetActorLocation();
+	bool bHit = World->LineTraceSingleByObjectType(LineTraceHitInteraction, PivotPosition, 
+		PivotPosition + (IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetForwardVector() : GetActorForwardVector()) * InteractionRange, 
+		ObjectParams, LineTraceParams);
+
+	ADoor* HitDoor = Cast<ADoor>(LineTraceHitInteraction.GetActor());
+	if (IsValid(HitDoor))
+	{
+		HitDoor->Execute_OnInteract(HitDoor, this);
+	}
 }

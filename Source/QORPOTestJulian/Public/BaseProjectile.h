@@ -29,11 +29,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Limit")
 	FTimerHandle LifeTimeHandle = FTimerHandle();
 
-	UPROPERTY(EditDefaultsOnly, Category = "Limit", meta = (ClampMin = 1.0f, ClampMax = 100.0f))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Limit", meta = (ClampMin = 1.0f, ClampMax = 100.0f))
 	float LifeTime = 6.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Stats", meta = (ClampMin = 0.1f, ClampMax = 1000.0f))
-	float Damage = 20.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta = (ClampMin = -1000.0f, ClampMax = -0.1f))
+	float Damage = -20.0f;
 
 	virtual void BeginPlay() override;
 

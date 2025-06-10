@@ -1,16 +1,21 @@
 #include "AttributesComponent.h"
 
-UAttributesComponent::UAttributesComponent()
+void UAttributesComponent::BeginPlay()
 {
-
+	Super::BeginPlay();
+	CurrentHealth = MaxHealth;
 }
 
-void UAttributesComponent::HealthReaction(const float Amount, bool bDamage)
+bool UAttributesComponent::HealthReaction(const float Amount)
 {
 	const float Health = CurrentHealth;
-	CurrentHealth = FMath::Clamp(Health + (bDamage ? -abs(Amount) : abs(Amount)), 0.0f, MaxHealth);
-	if (Health != CurrentHealth)
+	CurrentHealth = FMath::Clamp(Health + Amount, 0.0f, MaxHealth);
+	bool bSucces = Health != CurrentHealth;
+	if (bSucces)
 	{
 		OnHealthChanged.Broadcast(CurrentHealth);
 	}
+
+	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FString::FromInt(CurrentHealth));
+	return bSucces;
 }

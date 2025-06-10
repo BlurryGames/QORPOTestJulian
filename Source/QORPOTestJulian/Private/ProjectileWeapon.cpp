@@ -1,5 +1,12 @@
 #include "ProjectileWeapon.h"
 
+AProjectileWeapon::AProjectileWeapon() : Super()
+{
+	ProjectilesContainerComponent = CreateDefaultSubobject<USceneComponent>(FName("ProjectilesContainerComponent"));
+	ProjectilesContainerComponent->SetAbsolute(true, true, true);
+	ProjectilesContainerComponent->SetupAttachment(GetRootComponent());
+}
+
 void AProjectileWeapon::BeginPlay()
 {
 	Super::BeginPlay();
@@ -24,14 +31,15 @@ void AProjectileWeapon::BeginPlay()
 		{
 			ABaseProjectile* Projectile = World->SpawnActor<ABaseProjectile>(ProjectileClass, SpawnPosition, SpawnRotation, SpawnParameters);
 			ProjectilesContainer[i] = Projectile;
+			Projectile->AttachToComponent(ProjectilesContainerComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 			Projectile->SetOwner(this);
 		}
 	}
 }
 
-void AProjectileWeapon::OnPickup_Implementation(AShooterPlayer* Caller)
+void AProjectileWeapon::OnInteract_Implementation(AActor* Caller)
 {
-	Super::OnPickup_Implementation(Caller);
+	Super::OnInteract_Implementation(Caller);
 	for (ABaseProjectile* Projectile : ProjectilesContainer)
 	{
 		if (IsValid(Projectile))
@@ -41,20 +49,22 @@ void AProjectileWeapon::OnPickup_Implementation(AShooterPlayer* Caller)
 	}
 }
 
-void AProjectileWeapon::HandleFire_Implementation()
+bool AProjectileWeapon::HandleFire_Implementation()
 {
-	if (bActiveTrigger && Magazine > 0 && !ProjectilesContainer.IsEmpty())
+	const bool bSucces = Super::HandleFire_Implementation() && !ProjectilesContainer.IsEmpty();
+	if (!bSucces)
 	{
-		if (++CurrentIndex >= ProjectilesContainer.Num())
-		{
-			CurrentIndex = 0;
-		}
-
-		ABaseProjectile* Projectile = ProjectilesContainer[CurrentIndex];
-		Projectile->SetActorLocationAndRotation(IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
-			IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentRotation() : GetActorRotation());
-		Projectile->EnableProjectile(true);
+		return bSucces;
+	}
+	else if (++CurrentIndex >= ProjectilesContainer.Num())
+	{
+		CurrentIndex = 0;
 	}
 
-	Super::HandleFire_Implementation();
+	ABaseProjectile* Projectile = ProjectilesContainer[CurrentIndex];
+	Projectile->SetActorLocationAndRotation(IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
+		IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentRotation() : GetActorRotation());
+	Projectile->EnableProjectile(true);
+
+	return bSucces;
 }

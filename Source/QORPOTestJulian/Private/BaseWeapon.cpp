@@ -1,30 +1,33 @@
 #include "BaseWeapon.h"
+#include "ShooterPlayer.h"
 
-ABaseWeapon::ABaseWeapon()
+ABaseWeapon::ABaseWeapon() : Super()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
-	SetRootComponent(CreateDefaultSubobject<USceneComponent>(FName("RootComponent")));
-
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName("MeshComponent"));
-	MeshComponent->SetCollisionProfileName(FName("OverlapAllDynamic"));
-	MeshComponent->SetupAttachment(RootComponent);
-
 	MuzzleComponent = CreateDefaultSubobject<USceneComponent>(FName("MuzzleComponent"));
-	MuzzleComponent->SetupAttachment(RootComponent);
+	MuzzleComponent->SetupAttachment(GetRootComponent());
+
+	AudioComponent = CreateDefaultSubobject<UAudioComponent>(FName("AudioComponent"));
+	AudioComponent->SetAutoActivate(false);
+	AudioComponent->SetupAttachment(MuzzleComponent);
+}
+
+void ABaseWeapon::SetOwner(AActor* NewOwner)
+{
+	Super::SetOwner(NewOwner);
+	SetEvents(GetOwner<AShooterPlayer>(), false);
+	SetEvents(Cast<AShooterPlayer>(NewOwner));
 }
 
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
-	FTimerManager& TimerManager = GetWorldTimerManager();
-	TimerManager.SetTimer(CadencyTimerHandle, CadencyDelegate, Cadency, true);
+	GetWorldTimerManager().SetTimer(CadencyTimerHandle, CadencyDelegate, CadencyTime, true);
 }
 
 void ABaseWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (IsValid(MuzzleComponent))
+	if (IsValid(MuzzleComponent) && IsValid(GetOwner<AShooterPlayer>()))
 	{
 		const FVector& PivotPosition = MuzzleComponent->GetComponentLocation();
 		DrawDebugLine(GetWorld(), PivotPosition, PivotPosition + MuzzleComponent->GetForwardVector() * MaxRange, FColor::Red, false, -1.0f, 0, 1.0f);
@@ -34,24 +37,22 @@ void ABaseWeapon::Tick(float DeltaTime)
 void ABaseWeapon::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	GetWorldTimerManager().ClearAllTimersForObject(this);
 	SetEvents(GetOwner<AShooterPlayer>());
 }
 
-void ABaseWeapon::OnPickup_Implementation(AShooterPlayer* Caller)
+void ABaseWeapon::OnInteract_Implementation(AActor* Caller)
 {
-	if (SetEvents(Caller))
+	SetOwner(Caller);
+	if (!IsValid(Caller))
 	{
-		SetOwner(Caller);
+		GetWorldTimerManager().ClearTimer(ReloadTimerHandle);
+		bActiveTrigger = false;
+		Execute_OnTurnEnabled(this, false);
 	}
-}
-
-void ABaseWeapon::OnDrop_Implementation()
-{
-	GetWorldTimerManager().ClearTimer(ReloadTimerHandle);
-	bActiveTrigger = false;
-	SetEvents(GetOwner<AShooterPlayer>(), false);
-	SetOwner(nullptr);
+	else
+	{
+		bActiveAnimation = false;
+	}
 }
 
 bool ABaseWeapon::SetEvents(AShooterPlayer* Player, const bool bConnect)
@@ -60,7 +61,7 @@ bool ABaseWeapon::SetEvents(AShooterPlayer* Player, const bool bConnect)
 	if (success)
 	{
 		bConnect ? Player->OnShootHeld.AddUniqueDynamic(this, &ABaseWeapon::HandleShootHeld) : Player->OnShootHeld.RemoveDynamic(this, &ABaseWeapon::HandleShootHeld);
-		bConnect ? Player->OnReloaded.RemoveDynamic(this, &ABaseWeapon::HandleRealoaded) : Player->OnReloaded.RemoveDynamic(this, &ABaseWeapon::HandleRealoaded);
+		bConnect ? Player->OnReloaded.AddUniqueDynamic(this, &ABaseWeapon::HandleRealoaded) : Player->OnReloaded.RemoveDynamic(this, &ABaseWeapon::HandleRealoaded);
 	}
 
 	return success;
@@ -113,16 +114,35 @@ void ABaseWeapon::HandleReloadCompleted_Implementation(const int BullettsAmount)
 	}
 }
 
-void ABaseWeapon::HandleFire_Implementation()
+bool ABaseWeapon::HandleFire_Implementation()
 {
 	FTimerManager& TimerManager = GetWorldTimerManager();
-	if (!bActiveTrigger)
+	const bool bSuccess = (bActiveTrigger || TimerManager.IsTimerActive(IntervalTimerHandle)) && Magazine > 0;
+	if (!bSuccess)
 	{
 		TimerManager.PauseTimer(CadencyTimerHandle);
+		TimerManager.ClearTimer(IntervalTimerHandle);
+		IntervalCount = 0;
+
+		return bSuccess;
 	}
-	else if ((Magazine = FMath::Max(Magazine - ShotCost, 0)) <= 0)
+
+	const bool bInterval = IntervalProportionTime > 0.0f && ShotCost > 1;
+	Magazine = FMath::Max(Magazine - (bInterval ? 1 : ShotCost), 0);
+	if (Magazine <= 0 || (bInterval && ++IntervalCount >= ShotCost))
 	{
-		TimerManager.PauseTimer(CadencyTimerHandle);
-		bActiveTrigger = false;
+		TimerManager.ClearTimer(IntervalTimerHandle);
+		IntervalCount = 0;
 	}
+	else if (bInterval && !TimerManager.IsTimerActive(IntervalTimerHandle))
+	{
+		TimerManager.SetTimer(IntervalTimerHandle, CadencyDelegate, (CadencyTime / ShotCost) * IntervalProportionTime, true);
+	}
+
+	if (IsValid(AudioComponent))
+	{
+		AudioComponent->Play();
+	}
+
+	return bSuccess;
 }

@@ -1,21 +1,33 @@
 #include "RayWeapon.h"
 
-void ARayWeapon::HandleFire_Implementation()
+ARayWeapon::ARayWeapon() : Super()
 {
-	if (bActiveTrigger && Magazine > 0)
+	ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	LineTraceParams.AddIgnoredActor(this);
+}
+
+bool ARayWeapon::HandleFire_Implementation()
+{
+	UWorld* World = GetWorld();
+	const bool bSucces = IsValid(World) && Super::HandleFire_Implementation();
+	if (!bSucces)
 	{
-		FVector PivotPosition = MuzzleComponent->GetComponentLocation();
-		bool bHit = GetWorld()->LineTraceSingleByObjectType(LineTraceHitResult,
-			PivotPosition, PivotPosition + MuzzleComponent->GetForwardVector() * MaxRange,
-			ObjectParams, LineTraceParams);
-		AActor* HitActor = LineTraceHitResult.GetActor();
-		UAttributesComponent* AttributesComponent = IsValid(HitActor) ? HitActor->FindComponentByClass<UAttributesComponent>() : nullptr;
-		if (bHit && IsValid(AttributesComponent))
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, *HitActor->GetName());
-			AttributesComponent->HealthReaction(Damage);
-		}
+		return bSucces;
 	}
 
-	Super::HandleFire_Implementation();
+	FVector PivotPosition = IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation();
+	World->LineTraceSingleByObjectType(LineTraceHitResult, PivotPosition, 
+		PivotPosition + (IsValid(MuzzleComponent) ? MuzzleComponent->GetForwardVector() : GetActorForwardVector()) * MaxRange,
+		ObjectParams, LineTraceParams);
+
+	AActor* HitActor = LineTraceHitResult.GetActor();
+	UAttributesComponent* AttributesComponent = IsValid(HitActor) ? HitActor->FindComponentByClass<UAttributesComponent>() : nullptr;
+	if (IsValid(HitActor))
+	{
+		HitActor->TakeDamage(Damage, FDamageEvent(), GetInstigatorController(), this);
+	}
+
+	return bSucces;
 }

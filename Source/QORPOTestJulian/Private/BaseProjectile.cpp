@@ -63,15 +63,13 @@ void ABaseProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void ABaseProjectile::ImpactBody(AActor* Actor)
 {
-	if (Actor == GetOwner() || IsValid(Cast<ABaseProjectile>(Actor)) || IsValid(Cast<ABaseWeapon>(Actor)))
+	if (Actor == GetOwner() || IsValid(Cast<ABaseProjectile>(Actor)) || IsValid(Cast<ABaseItem>(Actor)))
 	{
 		return;
 	}
-
-	UAttributesComponent* AttributesComponent = IsValid(Actor) ? Actor->FindComponentByClass<UAttributesComponent>() : nullptr;
-	if (IsValid(AttributesComponent))
+	else if (IsValid(Actor))
 	{
-		AttributesComponent->HealthReaction(Damage);
+		Actor->TakeDamage(Damage, FDamageEvent(), GetInstigatorController(), this);
 	}
 
 	EnableProjectile(false);
