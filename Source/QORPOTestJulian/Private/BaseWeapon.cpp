@@ -13,20 +13,23 @@ ABaseWeapon::ABaseWeapon() : Super()
 
 void ABaseWeapon::SetOwner(AActor* NewOwner)
 {
-	Super::SetOwner(NewOwner);
 	SetEvents(GetOwner<AShooterPlayer>(), false);
 	SetEvents(Cast<AShooterPlayer>(NewOwner));
+
+	Super::SetOwner(NewOwner);
 }
 
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
+
 	GetWorldTimerManager().SetTimer(CadencyTimerHandle, CadencyDelegate, CadencyTime, true);
 }
 
 void ABaseWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
 	if (IsValid(MuzzleComponent) && IsValid(GetOwner<AShooterPlayer>()))
 	{
 		const FVector& PivotPosition = MuzzleComponent->GetComponentLocation();
@@ -37,6 +40,7 @@ void ABaseWeapon::Tick(float DeltaTime)
 void ABaseWeapon::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+
 	SetEvents(GetOwner<AShooterPlayer>());
 }
 
@@ -48,10 +52,12 @@ void ABaseWeapon::OnInteract_Implementation(AActor* Caller)
 		GetWorldTimerManager().ClearTimer(ReloadTimerHandle);
 		bActiveTrigger = false;
 		Execute_OnTurnEnabled(this, false);
+		SetInstigator(nullptr);
 	}
 	else
 	{
 		bActiveAnimation = false;
+		SetInstigator(Cast<APawn>(Caller));
 	}
 }
 
@@ -60,8 +66,8 @@ bool ABaseWeapon::SetEvents(AShooterPlayer* Player, const bool bConnect)
 	bool success = IsValid(Player);
 	if (success)
 	{
-		bConnect ? Player->OnShootHeld.AddUniqueDynamic(this, &ABaseWeapon::HandleShootHeld) : Player->OnShootHeld.RemoveDynamic(this, &ABaseWeapon::HandleShootHeld);
-		bConnect ? Player->OnReloaded.AddUniqueDynamic(this, &ABaseWeapon::HandleRealoaded) : Player->OnReloaded.RemoveDynamic(this, &ABaseWeapon::HandleRealoaded);
+		bConnect ? Player->OnShootHeld.AddUniqueDynamic(this, &ABaseWeapon::HandleShootHeld) : Player->OnShootHeld.RemoveAll(this);
+		bConnect ? Player->OnReloaded.AddUniqueDynamic(this, &ABaseWeapon::HandleRealoaded) : Player->OnReloaded.RemoveAll(this);
 	}
 
 	return success;

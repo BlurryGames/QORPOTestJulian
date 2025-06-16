@@ -40,6 +40,7 @@ void AProjectileWeapon::BeginPlay()
 void AProjectileWeapon::OnInteract_Implementation(AActor* Caller)
 {
 	Super::OnInteract_Implementation(Caller);
+
 	for (ABaseProjectile* Projectile : ProjectilesContainer)
 	{
 		if (IsValid(Projectile))
@@ -62,9 +63,10 @@ bool AProjectileWeapon::HandleFire_Implementation()
 	}
 
 	ABaseProjectile* Projectile = ProjectilesContainer[CurrentIndex];
-	Projectile->SetActorLocationAndRotation(IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
+	Projectile->Execute_SetOriginalPositionAndRotation(Projectile, 
+		IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
 		IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentRotation() : GetActorRotation());
-	Projectile->EnableProjectile(true);
+	Projectile->Execute_OnTurnEnabled(Projectile, true);
 
 	return bSucces;
 }

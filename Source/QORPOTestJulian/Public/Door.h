@@ -4,11 +4,12 @@
 #include "GameFramework/Actor.h"
 #include "Components/BoxComponent.h"
 #include "InteractableInterface.h"
+#include "ReusableInterface.h"
 
 #include "Door.generated.h"
 
-UCLASS()
-class QORPOTESTJULIAN_API ADoor : public AActor, public IInteractableInterface
+UCLASS(Blueprintable, BlueprintType)
+class QORPOTESTJULIAN_API ADoor : public AActor, public IInteractableInterface, public IReusableInterface
 {
 	GENERATED_BODY()
 	
@@ -61,7 +62,6 @@ protected:
 
 	virtual void OnInteract_Implementation(AActor* Caller) override;
 
-	virtual void OnTurnEnabled_Implementation(const bool bEnabled) override;
-
 	virtual void OnInteractionAnimation_Implementation(const float DeltaTime) override;
+
 };

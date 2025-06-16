@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS(Abstract, Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API AProjectileWeapon : public ABaseWeapon
 {
 	GENERATED_BODY()
@@ -24,7 +24,7 @@ protected:
 	TArray<ABaseProjectile*> ProjectilesContainer = TArray<ABaseProjectile*>();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Projectile")
-	TSubclassOf<ABaseProjectile> ProjectileClass;
+	TSubclassOf<ABaseProjectile> ProjectileClass = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Projectile")
 	int CurrentIndex = -1;

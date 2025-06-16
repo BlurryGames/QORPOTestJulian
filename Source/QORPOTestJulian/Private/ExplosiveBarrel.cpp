@@ -2,31 +2,32 @@
 
 AExplosiveBarrel::AExplosiveBarrel()
 {
-	SetRootComponent(CreateDefaultSubobject<USceneComponent>(FName("RootComponent")));
-	USceneComponent* MainSceneComponent = GetRootComponent();
-
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName("MeshComponent"));
-	MeshComponent->SetupAttachment(MainSceneComponent);
-
-	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(FName("CapsuleComponent"));
-	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	CapsuleComponent->SetCollisionResponseToAllChannels(ECR_Block);
-	CapsuleComponent->SetSimulatePhysics(true);
-	CapsuleComponent->SetupAttachment(MeshComponent);
+	MeshComponent->SetSimulatePhysics(true);
+	MeshComponent->SetCanEverAffectNavigation(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	MeshComponent->SetCollisionResponseToAllChannels(ECR_Block);
+	SetRootComponent(MeshComponent);
 
 	ExplosionSphereComponent = CreateDefaultSubobject<USphereComponent>(FName("ExplosionSphereComponent"));
 	ExplosionSphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ExplosionSphereComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
 	ExplosionSphereComponent->SetupAttachment(MeshComponent);
 
+	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(FName("CapsuleComponent"));
+	CapsuleComponent->bDynamicObstacle = true;
+	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapsuleComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CapsuleComponent->SetupAttachment(MeshComponent);
+
 	ParticleComponent = CreateDefaultSubobject<UParticleSystemComponent>(FName("ParticleComponent"));
 	ParticleComponent->SetAutoActivate(false);
 	ParticleComponent->bAllowRecycling = true;
-	ParticleComponent->SetupAttachment(MainSceneComponent);
+	ParticleComponent->SetupAttachment(MeshComponent);
 
 	AudioComponent = CreateDefaultSubobject<UAudioComponent>(FName("AudioComponent"));
 	AudioComponent->SetAutoActivate(false);
-	AudioComponent->SetupAttachment(MainSceneComponent);
+	AudioComponent->SetupAttachment(MeshComponent);
 
 	AttributesComponent = CreateDefaultSubobject<UAttributesComponent>(FName("AtrributesComponent"));
 
@@ -35,7 +36,7 @@ AExplosiveBarrel::AExplosiveBarrel()
 
 float AExplosiveBarrel::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	float DamageResult = -1.0f;
+	float DamageResult = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	if (!IsValid(AttributesComponent))
 	{
 		return DamageResult;
@@ -62,9 +63,9 @@ float AExplosiveBarrel::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 		const FVector& RadialPosition = RadialEvent.Origin;
 		DamageResult = -abs(RadialEvent.Params.GetDamageScale(FVector::Distance(CurrentPosition, RadialPosition)));
 		AttributesComponent->HealthReaction(DamageResult);
-		if (IsValid(CapsuleComponent))
+		if (IsValid(MeshComponent))
 		{
-			CapsuleComponent->AddImpulseAtLocation((CurrentPosition - RadialPosition).GetSafeNormal() * DamageResult * DamageAmount, RadialPosition);
+			MeshComponent->AddImpulseAtLocation((CurrentPosition - RadialPosition).GetSafeNormal() * DamageResult * DamageAmount, RadialPosition);
 		}
 		break;
 	}
@@ -78,6 +79,11 @@ float AExplosiveBarrel::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 void AExplosiveBarrel::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Execute_AddEnabledType(this, MeshComponent);
+	Execute_AddEnabledType(this, CapsuleComponent);
+
+	Execute_SetOriginalPositionAndRotation(this, GetActorLocation(), GetActorRotation());
 	if (IsValid(ExplosionSphereComponent))
 	{
 		RadialDamageParameters.OuterRadius = ExplosionSphereComponent->GetUnscaledSphereRadius();
@@ -85,10 +91,30 @@ void AExplosiveBarrel::BeginPlay()
 		RadialDamageEvent.Params = RadialDamageParameters;
 	}
 
+	if (IsValid(ParticleComponent))
+	{
+		ParticleComponent->OnSystemFinished.AddUniqueDynamic(this, &AExplosiveBarrel::HandleSystemFinished);
+	}
+
 	if (IsValid(AttributesComponent))
 	{
 		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AExplosiveBarrel::HandleHealthChange);
 	}
+}
+
+void AExplosiveBarrel::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if (IsValid(ParticleComponent))
+	{
+		ParticleComponent->OnSystemFinished.RemoveAll(this);
+	}
+}
+
+void AExplosiveBarrel::HandleSystemFinished_Implementation(UParticleSystemComponent* ParticleSystem)
+{
+	Execute_OnTurnEnabled(this, false);
 }
 
 void AExplosiveBarrel::HandleHealthChange(const float HealthResult)
@@ -102,7 +128,13 @@ void AExplosiveBarrel::HandleHealthChange(const float HealthResult)
 		AudioComponent->Play();
 	}
 
-	RadialDamageEvent.Origin = IsValid(ExplosionSphereComponent) ? ExplosionSphereComponent->GetComponentLocation() : GetActorLocation();
+	IsValid(ParticleComponent) && IsValid(ParticleComponent->Template) ? ParticleComponent->ActivateSystem(true) : Execute_OnTurnEnabled(this, false);
+	if (!IsValid(ExplosionSphereComponent))
+	{
+		return;
+	}
+
+	RadialDamageEvent.Origin = ExplosionSphereComponent->GetComponentLocation();
 	ExplosionSphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ExplosionSphereComponent->GetOverlappingActors(ExplosionOverlaps);
 	for (AActor* A : ExplosionOverlaps)
@@ -114,8 +146,4 @@ void AExplosiveBarrel::HandleHealthChange(const float HealthResult)
 	}
 
 	ExplosionSphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (IsValid(ParticleComponent))
-	{
-		ParticleComponent->ActivateSystem(true);
-	}
 }

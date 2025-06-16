@@ -4,8 +4,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "HealEvent.h"
 #include "ShooterPlayerController.h"
+#include "HealEvent.h"
 #include "AttributesComponent.h"
 
 #include "ShooterPlayer.generated.h"
@@ -15,7 +15,7 @@ class ABaseWeapon;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReloaded, const int, Amount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnShootHeld, const bool, bHold);
 
-UCLASS(Abstract, Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API AShooterPlayer : public ACharacter
 {
 	GENERATED_BODY()
@@ -82,13 +82,13 @@ protected:
 	FVector GetMovementDirection() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	void EquipWeapon(ABaseWeapon* Weapon);
+	void OnEquipWeapon(ABaseWeapon* Weapon);
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void ReloadSpent(const int Amount);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	void UnequipWeapon();
+	void OnUnequipWeapon();
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void HandleHealthChange(const float HealthResult);

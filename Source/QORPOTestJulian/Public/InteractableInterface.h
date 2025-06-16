@@ -19,23 +19,14 @@ class QORPOTESTJULIAN_API IInteractableInterface
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Pickup")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void OnInteract(AActor* Caller);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	void OnTurnEnabled(const bool bEnabled);
-
 protected:
-	FVector OriginalPosition = FVector::ZeroVector;
-
-	FRotator OriginalRotation = FRotator::ZeroRotator;
-
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Animation")
 	void OnInteractionAnimation(const float DeltaTime);
 
 	virtual void OnInteract_Implementation(AActor* Caller);
-
-	virtual void OnTurnEnabled_Implementation(const bool bEnabled);
 
 	virtual void OnInteractionAnimation_Implementation(const float DeltaTime);
 };

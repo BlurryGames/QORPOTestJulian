@@ -18,7 +18,16 @@ public:
 	FOnHealthChanged OnHealthChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	const float GetMaxHealth() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	const float GetHealth() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
 	bool HealthReaction(const float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void ResetHealth();
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attributes", meta = (ClampMin = 1.0f, ClampMax = 1000.0f))
@@ -28,4 +37,6 @@ protected:
 	float CurrentHealth = MaxHealth;
 
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };

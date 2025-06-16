@@ -125,7 +125,7 @@ void AShooterPlayer::Tick(float DeltaTime)
 void AShooterPlayer::NotifyActorBeginOverlap(AActor* OtherActor)
 {
 	Super::NotifyActorBeginOverlap(OtherActor);
-	EquipWeapon(Cast<ABaseWeapon>(OtherActor));
+	OnEquipWeapon(Cast<ABaseWeapon>(OtherActor));
 }
 
 void AShooterPlayer::AddControllerPitchInput(float Value)
@@ -141,8 +141,7 @@ void AShooterPlayer::AddControllerPitchInput(float Value)
 void AShooterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	UnequipWeapon();
-	AttributesComponent->OnHealthChanged.RemoveDynamic(this, &AShooterPlayer::HandleHealthChange);
+	OnUnequipWeapon();
 }
 
 void AShooterPlayer::AddAmmunition(const int Amount)
@@ -155,11 +154,11 @@ FVector AShooterPlayer::GetMovementDirection() const
 	return GetActorForwardVector() * MovementDirection.X + GetActorRightVector() * MovementDirection.Y;
 }
 
-void AShooterPlayer::EquipWeapon_Implementation(ABaseWeapon* Weapon)
+void AShooterPlayer::OnEquipWeapon_Implementation(ABaseWeapon* Weapon)
 {
 	if (IsValid(Weapon) && Weapon != CurrentWeapon)
 	{
-		UnequipWeapon();
+		OnUnequipWeapon();
 		Weapon->AttachToComponent(IsValid(WeaponSocketComponent) ? WeaponSocketComponent : GetRootComponent(), 
 			FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Weapon->Execute_OnInteract(Weapon, this);
@@ -174,13 +173,13 @@ void AShooterPlayer::ReloadSpent(const int Amount)
 	Ammunition = FMath::Max(Ammunition - abs(Amount), 0);
 }
 
-void AShooterPlayer::UnequipWeapon_Implementation()
+void AShooterPlayer::OnUnequipWeapon_Implementation()
 {
 	if (IsValid(CurrentWeapon))
 	{
 		CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		CurrentWeapon->Execute_OnInteract(CurrentWeapon, nullptr);
-		CurrentWeapon->OnReloadSpent.RemoveDynamic(this, &AShooterPlayer::ReloadSpent);
+		CurrentWeapon->OnReloadSpent.RemoveAll(this);
 		CurrentWeapon = nullptr;
 		LineTraceParams.ClearIgnoredSourceObjects();
 		LineTraceParams.AddIgnoredActor(this);

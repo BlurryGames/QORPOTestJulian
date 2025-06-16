@@ -15,20 +15,35 @@ ABaseItem::ABaseItem()
 void ABaseItem::BeginPlay()
 {
 	Super::BeginPlay();
-	OriginalPosition = GetActorLocation();
-	OriginalRotation = GetActorRotation();
+
+	Execute_AddEnabledType(this, MeshComponent);
+
+	Execute_SetOriginalPositionAndRotation(this, GetActorLocation(), GetActorRotation());
 }
 
 void ABaseItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
 	Execute_OnInteractionAnimation(this, DeltaTime);
 }
 
 void ABaseItem::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+
 	GetWorldTimerManager().ClearAllTimersForObject(this);
+}
+
+void ABaseItem::OnTurnEnabled_Implementation(const bool bEnabled)
+{
+	IReusableInterface::OnTurnEnabled_Implementation(bEnabled);
+
+	bActiveAnimation = bEnabled;
+	if (!bEnabled)
+	{
+		StartRespawnCountdown();
+	}
 }
 
 void ABaseItem::OnInteractionAnimation_Implementation(const float DeltaTime)
@@ -43,22 +58,6 @@ void ABaseItem::OnInteractionAnimation_Implementation(const float DeltaTime)
 	if (FVector::Distance(OriginalPosition, GetActorLocation()) > DisplacementDistanceLimit)
 	{
 		DisplacementDirection = -DisplacementDirection;
-	}
-}
-
-void ABaseItem::OnTurnEnabled_Implementation(const bool bEnabled)
-{
-	IInteractableInterface::OnTurnEnabled_Implementation(bEnabled);
-	if (IsValid(MeshComponent))
-	{
-		MeshComponent->SetVisibility(bEnabled);
-		MeshComponent->SetCollisionEnabled(bEnabled ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
-	}
-
-	bActiveAnimation = bEnabled;
-	if (!bEnabled)
-	{
-		StartRespawnCountdown();
 	}
 }
 

@@ -8,7 +8,7 @@
 /**
  * 
  */
-UCLASS(Abstract, Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API ARayWeapon : public ABaseWeapon
 {
 	GENERATED_BODY()

@@ -3,11 +3,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "InteractableInterface.h"
+#include "ReusableInterface.h"
 
 #include "BaseItem.generated.h"
 
 UCLASS(Abstract, Blueprintable, BlueprintType)
-class QORPOTESTJULIAN_API ABaseItem : public AActor, public IInteractableInterface
+class QORPOTESTJULIAN_API ABaseItem : public AActor, public IInteractableInterface, public IReusableInterface
 {
 	GENERATED_BODY()
 
@@ -48,9 +49,9 @@ protected:
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	virtual void OnInteractionAnimation_Implementation(const float DeltaTime) override;
-
 	virtual void OnTurnEnabled_Implementation(const bool bEnabled) override;
+
+	virtual void OnInteractionAnimation_Implementation(const float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Respawn")
 	void StartRespawnCountdown();

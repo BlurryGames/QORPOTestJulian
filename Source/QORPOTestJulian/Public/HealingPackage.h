@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API AHealingPackage : public ABaseItem
 {
 	GENERATED_BODY()
