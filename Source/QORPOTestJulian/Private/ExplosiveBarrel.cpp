@@ -98,7 +98,7 @@ void AExplosiveBarrel::BeginPlay()
 
 	if (IsValid(AttributesComponent))
 	{
-		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AExplosiveBarrel::HandleHealthChange);
+		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AExplosiveBarrel::HandleHealthChanged);
 	}
 }
 
@@ -117,7 +117,7 @@ void AExplosiveBarrel::HandleSystemFinished_Implementation(UParticleSystemCompon
 	Execute_OnTurnEnabled(this, false);
 }
 
-void AExplosiveBarrel::HandleHealthChange(const float HealthResult)
+void AExplosiveBarrel::HandleHealthChanged(const float HealthResult, const float TotalHealth)
 {
 	if (HealthResult > 0.0f)
 	{

@@ -7,7 +7,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Abstract, Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API AFlyingEnemy : public ABaseEnemy
 {
 	GENERATED_BODY()

@@ -19,6 +19,18 @@ void ABaseWeapon::SetOwner(AActor* NewOwner)
 	Super::SetOwner(NewOwner);
 }
 
+const FVector ABaseWeapon::GetAimPosition() const
+{
+	const FVector& Pivot = IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation();
+	const FVector& Direction = IsValid(MuzzleComponent) ? MuzzleComponent->GetForwardVector() : GetActorForwardVector();
+	return Pivot + Direction * MaxRange;
+}
+
+const int ABaseWeapon::GetMagazine() const
+{
+	return Magazine;
+}
+
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
@@ -30,10 +42,10 @@ void ABaseWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (IsValid(MuzzleComponent) && IsValid(GetOwner<AShooterPlayer>()))
+	if (IsValid(Cast<AShooterPlayer>(GetOwner())))
 	{
-		const FVector& PivotPosition = MuzzleComponent->GetComponentLocation();
-		DrawDebugLine(GetWorld(), PivotPosition, PivotPosition + MuzzleComponent->GetForwardVector() * MaxRange, FColor::Red, false, -1.0f, 0, 1.0f);
+		DrawDebugLine(GetWorld(), IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(), 
+			GetAimPosition(), FColor::Red, false, -1.0f, 0, 1.0f);
 	}
 }
 
@@ -67,13 +79,13 @@ bool ABaseWeapon::SetEvents(AShooterPlayer* Player, const bool bConnect)
 	if (success)
 	{
 		bConnect ? Player->OnShootHeld.AddUniqueDynamic(this, &ABaseWeapon::HandleShootHeld) : Player->OnShootHeld.RemoveAll(this);
-		bConnect ? Player->OnReloaded.AddUniqueDynamic(this, &ABaseWeapon::HandleRealoaded) : Player->OnReloaded.RemoveAll(this);
+		bConnect ? Player->OnReloadSpent.AddUniqueDynamic(this, &ABaseWeapon::HandleReloadSpent) : Player->OnReloadSpent.RemoveAll(this);
 	}
 
 	return success;
 }
 
-void ABaseWeapon::HandleRealoaded(const int BulletsAmount)
+void ABaseWeapon::HandleReloadSpent(const int BulletsAmount)
 {
 	FTimerManager& TimerManager = GetWorldTimerManager();
 	if (BulletsAmount < 1 || Magazine >= MagazineCapacity || TimerManager.IsTimerActive(ReloadTimerHandle))
@@ -111,8 +123,8 @@ void ABaseWeapon::HandleShootHeld(const bool bHold)
 void ABaseWeapon::HandleReloadCompleted_Implementation(const int BullettsAmount)
 {
 	const int ResultAmount = FMath::Min(BullettsAmount, MagazineCapacity - Magazine);
-	OnReloadSpent.Broadcast(ResultAmount);
 	Magazine += ResultAmount;
+	OnReloaded.Broadcast(ResultAmount);
 	if (bActiveTrigger)
 	{
 		GetWorldTimerManager().ClearTimer(ReloadTimerHandle);
@@ -135,6 +147,7 @@ bool ABaseWeapon::HandleFire_Implementation()
 
 	const bool bInterval = IntervalProportionTime > 0.0f && ShotCost > 1;
 	Magazine = FMath::Max(Magazine - (bInterval ? 1 : ShotCost), 0);
+	OnReloaded.Broadcast(0);
 	if (Magazine <= 0 || (bInterval && ++IntervalCount >= ShotCost))
 	{
 		TimerManager.ClearTimer(IntervalTimerHandle);

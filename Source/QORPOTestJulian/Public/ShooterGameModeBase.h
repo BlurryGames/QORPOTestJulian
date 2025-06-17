@@ -11,6 +11,7 @@
 
 #include "ShooterGameModeBase.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnRoundStarted, const int, Round);
 /**
  * 
  */
@@ -20,6 +21,9 @@ class QORPOTESTJULIAN_API AShooterGameModeBase : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnRoundStarted OnRoundStarted;
+
 	AShooterGameModeBase();
 
 protected:

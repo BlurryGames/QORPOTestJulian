@@ -1,4 +1,5 @@
 #include "ShooterPlayer.h"
+#include "ShooterPlayerController.h"
 #include "BaseWeapon.h"
 #include "Door.h"
 
@@ -55,7 +56,6 @@ float AShooterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 		UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 		if (IsValid(MovementComponent))
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Black, FString::FromInt(RadialEvent.Params.GetMaxRadius()));
 			MovementComponent->AddRadialImpulse(RadialPosition, RadialEvent.Params.GetMaxRadius(), DamageResult * DamageAmount, RIF_Linear, true);
 		}
 		break;
@@ -105,6 +105,7 @@ void AShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 void AShooterPlayer::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (IsValid(AttributesComponent))
 	{
 		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AShooterPlayer::HandleHealthChange);
@@ -114,6 +115,7 @@ void AShooterPlayer::BeginPlay()
 void AShooterPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
 	AddMovementInput(GetMovementDirection());
 
 	FVector PivotPosition = IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetComponentLocation() : GetActorLocation();
@@ -125,6 +127,7 @@ void AShooterPlayer::Tick(float DeltaTime)
 void AShooterPlayer::NotifyActorBeginOverlap(AActor* OtherActor)
 {
 	Super::NotifyActorBeginOverlap(OtherActor);
+
 	OnEquipWeapon(Cast<ABaseWeapon>(OtherActor));
 }
 
@@ -132,6 +135,7 @@ void AShooterPlayer::AddControllerPitchInput(float Value)
 {
 	const AShooterPlayerController* PlayerController = GetController<AShooterPlayerController>();
 	Super::AddControllerPitchInput(IsValid(PlayerController) && PlayerController->GetInvertPitch() ? Value : -Value);
+
 	if (IsValid(WeaponSocketComponent))
 	{
 		WeaponSocketComponent->SetRelativeRotation(FRotator(GetControlRotation().Pitch, 0.0f, 0.0f));
@@ -141,12 +145,25 @@ void AShooterPlayer::AddControllerPitchInput(float Value)
 void AShooterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+
 	OnUnequipWeapon();
+}
+
+UAttributesComponent* AShooterPlayer::GetAttributesComponent() const
+{
+	return AttributesComponent;
+}
+
+const int AShooterPlayer::GetAmmunition() const
+{
+	return Ammunition;
 }
 
 void AShooterPlayer::AddAmmunition(const int Amount)
 {
+	const int CurrentAmmunition = Ammunition;
 	Ammunition = FMath::Clamp(Ammunition + abs(Amount), 0, INT_MAX);
+	OnPlayerAmmunitionUpdated.Broadcast(Ammunition);
 }
 
 FVector AShooterPlayer::GetMovementDirection() const
@@ -162,15 +179,11 @@ void AShooterPlayer::OnEquipWeapon_Implementation(ABaseWeapon* Weapon)
 		Weapon->AttachToComponent(IsValid(WeaponSocketComponent) ? WeaponSocketComponent : GetRootComponent(), 
 			FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Weapon->Execute_OnInteract(Weapon, this);
-		Weapon->OnReloadSpent.AddUniqueDynamic(this, &AShooterPlayer::ReloadSpent);
+		Weapon->OnReloaded.AddUniqueDynamic(this, &AShooterPlayer::HandleReloaded);
 		CurrentWeapon = Weapon;
 		LineTraceParams.AddIgnoredActor(Weapon);
+		HandleReloaded(0);
 	}
-}
-
-void AShooterPlayer::ReloadSpent(const int Amount)
-{
-	Ammunition = FMath::Max(Ammunition - abs(Amount), 0);
 }
 
 void AShooterPlayer::OnUnequipWeapon_Implementation()
@@ -179,18 +192,34 @@ void AShooterPlayer::OnUnequipWeapon_Implementation()
 	{
 		CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		CurrentWeapon->Execute_OnInteract(CurrentWeapon, nullptr);
-		CurrentWeapon->OnReloadSpent.RemoveAll(this);
+		CurrentWeapon->OnReloaded.RemoveAll(this);
 		CurrentWeapon = nullptr;
 		LineTraceParams.ClearIgnoredSourceObjects();
 		LineTraceParams.AddIgnoredActor(this);
+		HandleReloaded(0);
 	}
 }
 
-void AShooterPlayer::HandleHealthChange(const float HealthResult)
+void AShooterPlayer::HandleHealthChange(const float HealthResult, const float TotalHealth)
 {
 	if (HealthResult <= 0.0f)
 	{
 		Destroy();
+	}
+}
+
+void AShooterPlayer::HandleReloaded(const int AmmunitionSpent)
+{
+	const int CurrentAmmunition = Ammunition;
+	Ammunition = FMath::Max(Ammunition - abs(AmmunitionSpent), 0);
+	if (CurrentAmmunition != Ammunition)
+	{
+		OnPlayerAmmunitionUpdated.Broadcast(Ammunition);
+	}
+
+	if (IsValid(CurrentWeapon))
+	{
+		OnWeaponMagazineUpdated.Broadcast(CurrentWeapon->GetMagazine());
 	}
 }
 
@@ -242,7 +271,7 @@ void AShooterPlayer::HandleStopShoot()
 
 void AShooterPlayer::HandleReload()
 {
-	OnReloaded.Broadcast(Ammunition);
+	OnReloadSpent.Broadcast(Ammunition);
 }
 
 void AShooterPlayer::HandleInteraction()

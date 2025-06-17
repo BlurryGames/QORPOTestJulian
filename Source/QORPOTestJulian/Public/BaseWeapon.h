@@ -8,7 +8,7 @@
 
 class AShooterPlayer;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReloadSpent, const int, Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReloaded, const int, Amount);
 
 UCLASS(Abstract, Blueprintable, BlueprintType)
 class QORPOTESTJULIAN_API ABaseWeapon : public ABaseItem
@@ -16,12 +16,18 @@ class QORPOTESTJULIAN_API ABaseWeapon : public ABaseItem
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnReloaded OnReloaded;
+
 	ABaseWeapon();
 
 	virtual void SetOwner(AActor* NewOwner) override;
 
-	UPROPERTY(BlueprintAssignable, Category = "Events")
-	FOnReloadSpent OnReloadSpent;
+	UFUNCTION(BlueprintCallable, Category = "Weapon|Stats")
+	const FVector GetAimPosition() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon|Stats")
+	const int GetMagazine() const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -78,7 +84,7 @@ protected:
 	bool SetEvents(AShooterPlayer* Player, const bool bConnect = true);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|State")
-	void HandleRealoaded(const int BulletsAmount);
+	void HandleReloadSpent(const int BulletsAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|State")
 	void HandleShootHeld(const bool bHold);

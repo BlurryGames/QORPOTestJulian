@@ -80,5 +80,5 @@ protected:
 	void HandleSystemFinished(UParticleSystemComponent* ParticleSystem);
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void HandleHealthChange(const float HealthResult);
+	void HandleHealthChanged(const float HealthResult, const float TotalHealth);
 };

@@ -31,6 +31,7 @@ void AShooterGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     Super::EndPlay(EndPlayReason);
 
+    OnRoundStarted.Clear();
     GetWorldTimerManager().ClearAllTimersForObject(this);
 }
 
@@ -118,4 +119,5 @@ void AShooterGameModeBase::HandleNextRound_Implementation()
     }
 
     CurrentRound = FMath::Clamp(CurrentRound + 1, 0, INT_MAX);
+    OnRoundStarted.Broadcast(CurrentRound);
 }

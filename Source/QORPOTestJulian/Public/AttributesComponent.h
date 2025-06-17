@@ -6,7 +6,7 @@
 #include "AttributesComponent.generated.h"
 
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, const float, HealthResult);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChanged, const float, HealthResult, const float, TotalHealth);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class QORPOTESTJULIAN_API UAttributesComponent : public UActorComponent

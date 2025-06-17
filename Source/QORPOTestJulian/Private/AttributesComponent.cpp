@@ -29,7 +29,7 @@ bool UAttributesComponent::HealthReaction(const float Amount)
 	bool bSucces = Health != CurrentHealth;
 	if (bSucces)
 	{
-		OnHealthChanged.Broadcast(CurrentHealth);
+		OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	}
 
 	return bSucces;

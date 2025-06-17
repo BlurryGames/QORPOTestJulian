@@ -4,7 +4,6 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "ShooterPlayerController.h"
 #include "HealEvent.h"
 #include "AttributesComponent.h"
 
@@ -12,7 +11,9 @@
 
 class ABaseWeapon;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReloaded, const int, Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponMagazineUpdated, const int, Magazine);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerAmmunitionUpdated, const int, Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReloadSpent, const int, Amount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnShootHeld, const bool, bHold);
 
 UCLASS(Blueprintable, BlueprintType)
@@ -22,7 +23,13 @@ class QORPOTESTJULIAN_API AShooterPlayer : public ACharacter
 
 public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
-	FOnReloaded OnReloaded;
+	FOnPlayerAmmunitionUpdated OnPlayerAmmunitionUpdated;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnWeaponMagazineUpdated OnWeaponMagazineUpdated;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnReloadSpent OnReloadSpent;
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnShootHeld OnShootHeld;
@@ -30,6 +37,12 @@ public:
 	AShooterPlayer();
 
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	UAttributesComponent* GetAttributesComponent() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Stats|Equipment")
+	const int GetAmmunition() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Interction")
 	void AddAmmunition(const int Amount);
@@ -57,10 +70,10 @@ protected:
 	float DefaultSpeed = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Movement", meta = (ClampMin = 1.1f, ClampMax = 10.0f))
-	float SprintMultiplier = 2.2f;
+	float SprintMultiplier = 1.6f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Equipment", meta = (ClampMin = 0, ClampMax = 10000))
-	int Ammunition = 120;
+	int Ammunition = 0;
 
 	FCollisionObjectQueryParams ObjectParams = FCollisionObjectQueryParams(ECC_WorldDynamic);
 
@@ -84,14 +97,14 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void OnEquipWeapon(ABaseWeapon* Weapon);
 
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void ReloadSpent(const int Amount);
-
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void OnUnequipWeapon();
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void HandleHealthChange(const float HealthResult);
+	void HandleHealthChange(const float HealthResult, const float TotalHealth);
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void HandleReloaded(const int AmmunitionSpent);
 
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void HandleMoveForward();

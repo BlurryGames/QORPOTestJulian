@@ -1,6 +1,7 @@
 #include "BaseEnemy.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
+#include "ShooterPlayerController.h"
 #include "ShooterPlayer.h"
 
 ABaseEnemy::ABaseEnemy()
@@ -113,7 +114,7 @@ void ABaseEnemy::BeginPlay()
 
     if (IsValid(AttributesComponent))
     {
-        AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &ABaseEnemy::HandleHealthChange);
+        AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &ABaseEnemy::HandleHealthChanged);
     }
 
     if (IsValid(ParticleComponent))
@@ -146,7 +147,7 @@ void ABaseEnemy::NotifyActorBeginOverlap(AActor* OtherActor)
     if (bEnableStatus && OtherActor != this && IsValid(Cast<AShooterPlayer>(OtherActor)))
     {
         OtherActor->TakeDamage(Damage, FDamageEvent(), GetInstigatorController(), this);
-        HandleHealthChange(0.0f);
+        HandleHealthChanged(0.0f, 0.0f);
     }
 }
 
@@ -220,7 +221,7 @@ void ABaseEnemy::HandleSystemFinished_Implementation(UParticleSystemComponent* P
     Execute_OnTurnEnabled(this, false);
 }
 
-void ABaseEnemy::HandleHealthChange(const float HealthResult)
+void ABaseEnemy::HandleHealthChanged(const float HealthResult, const float TotalHealth)
 {
     if (HealthResult > 0.0f)
     {
