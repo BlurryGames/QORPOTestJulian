@@ -3,6 +3,8 @@
 ADoor::ADoor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	SetReplicates(true);
+	SetReplicateMovement(true);
 
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(FName("RootComponent")));
 
@@ -39,6 +41,15 @@ void ADoor::BeginPlay()
 	DesiredRotation = (OriginalRotation.GetManhattanDistance(OriginalRotation + CloseRotationOffset) 
 		< OriginalRotation.GetManhattanDistance(OriginalRotation + OpenRotationOffset) 
 		? CloseRotationOffset : OpenRotationOffset) + OriginalRotation;
+}
+
+void ADoor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ADoor, DesiredPosition);
+	DOREPLIFETIME(ADoor, DesiredRotation);
+	DOREPLIFETIME(ADoor, bActiveAnimation);
 }
 
 void ADoor::Tick(float DeltaTime)

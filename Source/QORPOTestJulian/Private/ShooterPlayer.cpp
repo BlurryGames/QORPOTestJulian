@@ -7,6 +7,8 @@ AShooterPlayer::AShooterPlayer() : Super()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bUseControllerRotationYaw = true;
+	SetReplicates(true);
+	SetReplicateMovement(true);
 
 	UCharacterMovementComponent& MovementComponent = *GetCharacterMovement();
 	DefaultSpeed = MovementComponent.MaxWalkSpeed;
@@ -112,6 +114,13 @@ void AShooterPlayer::BeginPlay()
 	}
 }
 
+void AShooterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AShooterPlayer, Ammunition);
+}
+
 void AShooterPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -136,10 +145,7 @@ void AShooterPlayer::AddControllerPitchInput(float Value)
 	const AShooterPlayerController* PlayerController = GetController<AShooterPlayerController>();
 	Super::AddControllerPitchInput(IsValid(PlayerController) && PlayerController->GetInvertPitch() ? Value : -Value);
 
-	if (IsValid(WeaponSocketComponent))
-	{
-		WeaponSocketComponent->SetRelativeRotation(FRotator(GetControlRotation().Pitch, 0.0f, 0.0f));
-	}
+	Server_UpdatePitchView(GetControlRotation().Pitch);
 }
 
 void AShooterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -200,6 +206,11 @@ void AShooterPlayer::OnUnequipWeapon_Implementation()
 	}
 }
 
+void AShooterPlayer::OnReplicateAmmunition()
+{
+	OnPlayerAmmunitionUpdated.Broadcast(Ammunition);
+}
+
 void AShooterPlayer::HandleHealthChange(const float HealthResult, const float TotalHealth)
 {
 	if (HealthResult <= 0.0f)
@@ -210,11 +221,11 @@ void AShooterPlayer::HandleHealthChange(const float HealthResult, const float To
 
 void AShooterPlayer::HandleReloaded(const int AmmunitionSpent)
 {
-	const int CurrentAmmunition = Ammunition;
-	Ammunition = FMath::Max(Ammunition - abs(AmmunitionSpent), 0);
+	const int CurrentAmmunition = FMath::Max(Ammunition - abs(AmmunitionSpent), 0);
 	if (CurrentAmmunition != Ammunition)
 	{
-		OnPlayerAmmunitionUpdated.Broadcast(Ammunition);
+		Ammunition = CurrentAmmunition;
+		OnPlayerAmmunitionUpdated.Broadcast(CurrentAmmunition);
 	}
 
 	if (IsValid(CurrentWeapon))
@@ -259,17 +270,17 @@ void AShooterPlayer::HandleJump()
 	Jump();
 }
 
-void AShooterPlayer::HandleStartShoot()
+void AShooterPlayer::HandleStartShoot_Implementation()
 {
 	OnShootHeld.Broadcast(true);
 }
 
-void AShooterPlayer::HandleStopShoot()
+void AShooterPlayer::HandleStopShoot_Implementation()
 {
 	OnShootHeld.Broadcast(false);
 }
 
-void AShooterPlayer::HandleReload()
+void AShooterPlayer::HandleReload_Implementation()
 {
 	OnReloadSpent.Broadcast(Ammunition);
 }
@@ -286,10 +297,29 @@ void AShooterPlayer::HandleInteraction()
 	bool bHit = World->LineTraceSingleByObjectType(LineTraceHitInteraction, PivotPosition, 
 		PivotPosition + (IsValid(WeaponSocketComponent) ? WeaponSocketComponent->GetForwardVector() : GetActorForwardVector()) * InteractionRange, 
 		ObjectParams, LineTraceParams);
-
-	ADoor* HitDoor = Cast<ADoor>(LineTraceHitInteraction.GetActor());
-	if (IsValid(HitDoor))
+	if (bHit)
 	{
-		HitDoor->Execute_OnInteract(HitDoor, this);
+		Server_DoorInteraction(Cast<ADoor>(LineTraceHitInteraction.GetActor()));
+	}
+}
+
+void AShooterPlayer::Server_DoorInteraction_Implementation(ADoor* Door)
+{
+	if (IsValid(Door))
+	{
+		Door->Execute_OnInteract(Door, this);
+	}
+}
+
+void AShooterPlayer::Server_UpdatePitchView_Implementation(const float PitchInput)
+{
+	Multicast_UpdatePitchView(PitchInput);
+}
+
+void AShooterPlayer::Multicast_UpdatePitchView_Implementation(const float PitchInput)
+{
+	if (IsValid(WeaponSocketComponent))
+	{
+		WeaponSocketComponent->SetRelativeRotation(FRotator(PitchInput, 0.0f, 0.0f));
 	}
 }

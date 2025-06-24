@@ -63,16 +63,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats", meta = (ClampMin = 1, ClampMax = 100))
 	int MagazineCapacity = 30;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
 	int Magazine = MagazineCapacity;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
 	int IntervalCount = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|State")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|State")
 	bool bActiveTrigger = false;
 
 	virtual void BeginPlay() override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -83,6 +85,9 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Weapon|State")
 	bool SetEvents(AShooterPlayer* Player, const bool bConnect = true);
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Weapon|State")
+	bool HandleFire();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon|State")
 	void HandleReloadSpent(const int BulletsAmount);
 
@@ -92,8 +97,8 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Weapon|State")
 	void HandleReloadCompleted(const int BullettsAmount);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Weapon|State")
-	bool HandleFire();
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Weapon|State")
+	void Multicast_FireMechanism();
 
 private:
 	const FTimerDelegate CadencyDelegate = FTimerDelegate::CreateUFunction(this, GET_FUNCTION_NAME_CHECKED(ABaseWeapon, HandleFire));

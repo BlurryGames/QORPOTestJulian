@@ -1,4 +1,5 @@
 #include "ReusableInterface.h"
+#include "ShooterPlayerController.h"
 
 FVector IReusableInterface::GetOriginalPosition_Implementation()
 {
@@ -75,5 +76,20 @@ void IReusableInterface::AddEnabledType_Implementation(UPrimitiveComponent* Prim
 	{
 		CollisionEnabledTypes.FindOrAdd(PrimitiveComponent);
 		CollisionEnabledTypes[PrimitiveComponent] = PrimitiveComponent->GetCollisionEnabled();
+	}
+}
+
+void IReusableInterface::DoDamage_Implementation(AActor* DamageReceiver, float DamageAmount, FDamageEvent const& DamageEvent)
+{
+	AActor* Self = Cast<AActor>(this);
+	if (!IsValid(Self))
+	{
+		return;
+	}
+
+	AShooterPlayerController* ShooterPlayerController = Self->GetInstigatorController<AShooterPlayerController>();
+	if (IsValid(ShooterPlayerController))
+	{
+		ShooterPlayerController->Server_DoDamage(DamageReceiver, DamageAmount, DamageEvent, ShooterPlayerController, Self);
 	}
 }

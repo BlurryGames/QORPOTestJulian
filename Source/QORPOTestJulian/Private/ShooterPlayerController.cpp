@@ -4,6 +4,8 @@
 
 AShooterPlayerController::AShooterPlayerController()
 {
+	SetReplicates(true);
+	SetReplicateMovement(true);
 	SetShowMouseCursor(false);
 }
 
@@ -12,11 +14,20 @@ void AShooterPlayerController::BeginPlay()
 	Super::BeginPlay();
 
 	CreatePlayerWidget();
-	AShooterGameModeBase* GameMode = GetWorld()->GetAuthGameMode<AShooterGameModeBase>();
-	if (IsValid(GameMode) && IsValid(PlayerWidget))
+	UWorld* World = GetWorld();
+	AShooterGameModeBase* GameMode = IsValid(World) ? World->GetAuthGameMode<AShooterGameModeBase>() : nullptr;
+	if (IsValid(GameMode))
 	{
-		GameMode->OnRoundStarted.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleRoundTextUpdated);
+		GameMode->OnRoundStarted.AddUniqueDynamic(this, &AShooterPlayerController::Multicast_HandleRoundUpdated);
 	}
+}
+
+void AShooterPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AShooterPlayerController, SurviveTime);
+	DOREPLIFETIME(AShooterPlayerController, CurrentScore);
 }
 
 void AShooterPlayerController::Tick(float DeltaTime)
@@ -30,20 +41,18 @@ void AShooterPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	CreatePlayerWidget();
 	AShooterPlayer* ShooterPlayer = Cast<AShooterPlayer>(InPawn);
-	if (!IsValid(PlayerWidget) || !IsValid(ShooterPlayer))
+	if (!IsValid(ShooterPlayer))
 	{
 		return;
 	}
 	else if (IsValid(ShooterPlayer->GetAttributesComponent()))
 	{
-		ShooterPlayer->GetAttributesComponent()->OnHealthChanged.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleHealthProgressBarUpdated);
+		ShooterPlayer->GetAttributesComponent()->OnHealthChanged.AddUniqueDynamic(this, &AShooterPlayerController::Multicast_HandleHealthUpdated);
 	}
 
-	ShooterPlayer->OnPlayerAmmunitionUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandlePlayerAmmunitionTextUpdated);
-	ShooterPlayer->OnWeaponMagazineUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleWeaponMagazineTextUpdated);
-	ShooterPlayer->AddAmmunition(0);
+	ShooterPlayer->OnPlayerAmmunitionUpdated.AddUniqueDynamic(this, &AShooterPlayerController::Multicast_HandlePlayerAmmunitionUpdated);
+	ShooterPlayer->OnWeaponMagazineUpdated.AddUniqueDynamic(this, &AShooterPlayerController::Multicast_HandleWeaponMagazineUpdated);
 }
 
 void AShooterPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -69,6 +78,14 @@ void AShooterPlayerController::UpdateScore(const float Points)
 	}
 }
 
+void AShooterPlayerController::Server_DoDamage_Implementation(AActor* DamageReceiver, float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (IsValid(DamageReceiver))
+	{
+		DamageReceiver->TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	}
+}
+
 void AShooterPlayerController::UpdateSurviveTime()
 {
 	APawn* CurrentPawn = GetPawn();
@@ -87,12 +104,72 @@ void AShooterPlayerController::UpdateSurviveTime()
 
 void AShooterPlayerController::CreatePlayerWidget()
 {
-	if (IsValid(PlayerWidgetClass) && !IsValid(PlayerWidget))
+	bool bCantSetUI = false;
+	switch (GetNetMode())
 	{
-		PlayerWidget = CreateWidget<UPlayerWidget>(this, PlayerWidgetClass);
-		PlayerWidget->AddToPlayerScreen();
+	case NM_DedicatedServer:
+		bCantSetUI = HasAuthority();
+		break;
+	case NM_ListenServer:
+		bCantSetUI = HasAuthority() && !IsLocalPlayerController();
+	}
 
-		OnSurviveTimeUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleSurviveTimeTextUpdated);
-		OnScoreUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleScoreTextUpdated);
+	if (bCantSetUI || !IsValid(PlayerWidgetClass) || IsValid(PlayerWidget))
+	{
+		return;
+	}
+
+	PlayerWidget = CreateWidget<UPlayerWidget>(this, PlayerWidgetClass);
+	PlayerWidget->AddToPlayerScreen();
+
+	OnSurviveTimeUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleSurviveTimeTextUpdated);
+	OnScoreUpdated.AddUniqueDynamic(PlayerWidget, &UPlayerWidget::HandleScoreTextUpdated);
+
+	AShooterPlayer* ShooterPlayer = GetPawn<AShooterPlayer>();
+	if (IsValid(ShooterPlayer))
+	{
+		Multicast_HandlePlayerAmmunitionUpdated(ShooterPlayer->GetAmmunition());
+	}
+}
+
+void AShooterPlayerController::OnReplicateSurviveTime()
+{
+	OnSurviveTimeUpdated.Broadcast(SurviveTime);
+}
+
+void AShooterPlayerController::OnReplicatedCurrentScore()
+{
+	OnScoreUpdated.Broadcast(CurrentScore);
+}
+
+void AShooterPlayerController::Multicast_HandleHealthUpdated_Implementation(const float CurrentHealth, const float MaxHealth)
+{
+	if (IsValid(PlayerWidget))
+	{
+		PlayerWidget->HandleHealthProgressBarUpdated(CurrentHealth, MaxHealth);
+	}
+}
+
+void AShooterPlayerController::Multicast_HandleRoundUpdated_Implementation(const int CurrentRound)
+{
+	if (IsValid(PlayerWidget))
+	{
+		PlayerWidget->HandleRoundTextUpdated(CurrentRound);
+	}
+}
+
+void AShooterPlayerController::Multicast_HandleWeaponMagazineUpdated_Implementation(const int Magazine)
+{
+	if (IsValid(PlayerWidget))
+	{
+		PlayerWidget->HandleWeaponMagazineTextUpdated(Magazine);
+	}
+}
+
+void AShooterPlayerController::Multicast_HandlePlayerAmmunitionUpdated_Implementation(const int CurrentAmmunition)
+{
+	if (IsValid(PlayerWidget))
+	{
+		PlayerWidget->HandlePlayerAmmunitionTextUpdated(CurrentAmmunition);
 	}
 }

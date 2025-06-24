@@ -18,6 +18,9 @@ public:
 
 	virtual void SetOwner(AActor* NewOwner) override;
 
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Movement")
+	void Multicast_ProjectileOut(const FVector& Position, const FRotator& Rotation, const bool bEnable = true);
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* MeshComponent = nullptr;

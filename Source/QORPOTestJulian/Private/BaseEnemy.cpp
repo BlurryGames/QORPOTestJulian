@@ -7,6 +7,9 @@
 ABaseEnemy::ABaseEnemy()
 {
     PrimaryActorTick.bCanEverTick = true;
+    bAlwaysRelevant = true;
+    SetReplicates(true);
+    SetReplicateMovement(true);
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(FName("RootComponent")));
@@ -77,7 +80,6 @@ float ABaseEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent
         bSuccessReaction = AttributesComponent->HealthReaction(-DamageResult);
         if (IsValid(FloatingMovement))
         {
-            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Black, FString::FromInt(RadialEvent.Params.GetMaxRadius()));
             FloatingMovement->AddRadialImpulse(RadialPosition, RadialEvent.Params.GetMaxRadius(), DamageResult * DamageAmount, RIF_Linear, true);
         }
 
@@ -117,11 +119,6 @@ void ABaseEnemy::BeginPlay()
         AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &ABaseEnemy::HandleHealthChanged);
     }
 
-    if (IsValid(ParticleComponent))
-    {
-        ParticleComponent->OnSystemFinished.AddUniqueDynamic(this, &ABaseEnemy::HandleSystemFinished);
-    }
-
     for (TActorIterator<AShooterPlayer> I(GetWorld()); I; ++I)
     {
         if (IsValid(*I))
@@ -156,9 +153,23 @@ void ABaseEnemy::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 
     OnEnemyOut.Clear();
-    if (IsValid(ParticleComponent))
+}
+
+void ABaseEnemy::Multicast_Spawn_Implementation(const FVector& Position, const bool bEnable)
+{
+    Execute_SetOriginalPosition(this, Position);
+    Execute_OnTurnEnabled(this, bEnable);
+    if (!HasAuthority() || !bEnable)
     {
-        ParticleComponent->OnSystemFinished.RemoveAll(this);
+        return;
+    }
+
+    for (TActorIterator<AShooterPlayer> I(GetWorld()); I; ++I)
+    {
+        if (IsValid(*I))
+        {
+            Targets.AddUnique(*I);
+        }
     }
 }
 
@@ -166,13 +177,11 @@ void ABaseEnemy::OnTurnEnabled_Implementation(const bool bEnabled)
 {
     IReusableInterface::OnTurnEnabled_Implementation(bEnabled);
 
-    if (!bEnabled)
+    if (HasAuthority() && !bEnabled)
     {
         OnEnemyOut.Broadcast(this);
         MoveRequest = FAIMoveRequest();
         CurrentTarget = nullptr;
-
-        return;
     }
     else if (IsValid(AttributesComponent))
     {
@@ -180,9 +189,18 @@ void ABaseEnemy::OnTurnEnabled_Implementation(const bool bEnabled)
     }
 }
 
+void ABaseEnemy::StartDissapearTimer()
+{
+    FTimerManager& TimerManager = GetWorldTimerManager();
+    if (HasAuthority() && !TimerManager.IsTimerActive(DissapearTimerHandle))
+    {
+        TimerManager.SetTimer(DissapearTimerHandle, DissapearDelegate, DissapearTime, false);
+    }
+}
+
 void ABaseEnemy::OnUpdateTarget_Implementation()
 {
-    if (!bEnableStatus)
+    if (!HasAuthority() && !bEnableStatus)
     {
         return;
     }
@@ -216,11 +234,6 @@ void ABaseEnemy::OnUpdateTarget_Implementation()
     }
 }
 
-void ABaseEnemy::HandleSystemFinished_Implementation(UParticleSystemComponent* ParticleSystem)
-{
-    Execute_OnTurnEnabled(this, false);
-}
-
 void ABaseEnemy::HandleHealthChanged(const float HealthResult, const float TotalHealth)
 {
     if (HealthResult > 0.0f)
@@ -232,8 +245,13 @@ void ABaseEnemy::HandleHealthChanged(const float HealthResult, const float Total
         AudioComponent->Play();
     }
 
+    if (IsValid(ParticleComponent))
+    {
+        ParticleComponent->ActivateSystem(true);
+    }
+
     SetActorTickEnabled(false);
-    IsValid(ParticleComponent) && IsValid(ParticleComponent->Template) ? ParticleComponent->ActivateSystem(true) : Execute_OnTurnEnabled(this, false);
+    StartDissapearTimer();
     AAIController* AIController = GetController<AAIController>();
     if (IsValid(AIController))
     {

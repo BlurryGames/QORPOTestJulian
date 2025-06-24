@@ -10,6 +10,7 @@
 #include "ShooterPlayer.generated.h"
 
 class ABaseWeapon;
+class ADoor;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponMagazineUpdated, const int, Magazine);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerAmmunitionUpdated, const int, Amount);
@@ -72,7 +73,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Movement", meta = (ClampMin = 1.1f, ClampMax = 10.0f))
 	float SprintMultiplier = 1.6f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Equipment", meta = (ClampMin = 0, ClampMax = 10000))
+	UPROPERTY(ReplicatedUsing = OnReplicateAmmunition, EditDefaultsOnly, BlueprintReadOnly, Category = "Stats|Equipment", meta = (ClampMin = 0, ClampMax = 10000))
 	int Ammunition = 0;
 
 	FCollisionObjectQueryParams ObjectParams = FCollisionObjectQueryParams(ECC_WorldDynamic);
@@ -82,6 +83,8 @@ protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	virtual void BeginPlay() override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -99,6 +102,9 @@ protected:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void OnUnequipWeapon();
+
+	UFUNCTION(BlueprintCallable, Category = "Stats|Equipment")
+	void OnReplicateAmmunition();
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void HandleHealthChange(const float HealthResult, const float TotalHealth);
@@ -127,15 +133,24 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void HandleJump();
 
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Interaction")
 	void HandleStartShoot();
 
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Interaction")
 	void HandleStopShoot();
 
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Interaction")
 	void HandleReload();
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void HandleInteraction();
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Interaction")
+	void Server_DoorInteraction(ADoor* Door);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Movement")
+	void Server_UpdatePitchView(const float PitchInput);
+
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Movement")
+	void Multicast_UpdatePitchView(const float PitchInput);
 };

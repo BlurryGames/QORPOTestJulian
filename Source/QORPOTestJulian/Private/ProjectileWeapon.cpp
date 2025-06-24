@@ -12,30 +12,52 @@ void AProjectileWeapon::BeginPlay()
 	Super::BeginPlay();
 
 	UWorld* World = GetWorld();
-	if (!IsValid(World) || !IsValid(ProjectileClass))
+	if (!HasAuthority() || !IsValid(World) || !IsValid(ProjectileClass))
 	{
 		return;
-	}
-	else if (ProjectilesContainer.IsEmpty())
-	{
-		ProjectilesContainer.Init(nullptr, MagazineCapacity);
 	}
 
 	FActorSpawnParameters SpawnParameters = FActorSpawnParameters();
 	SpawnParameters.Owner = this;
 	const FVector& SpawnPosition = GetActorLocation();
 	const FRotator& SpawnRotation = GetActorRotation();
-	for (unsigned short i = 0; i < ProjectilesContainer.Num(); i++)
+	for (unsigned short i = 0; i < MagazineCapacity; i++)
 	{
-		if (!IsValid(ProjectilesContainer[i]))
-		{
-			ABaseProjectile* Projectile = World->SpawnActor<ABaseProjectile>(ProjectileClass, SpawnPosition, SpawnRotation, SpawnParameters);
-			ProjectilesContainer[i] = Projectile;
-			Projectile->AttachToComponent(ProjectilesContainerComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-			Projectile->SetOwner(this);
-		}
+		ABaseProjectile* Projectile = World->SpawnActor<ABaseProjectile>(ProjectileClass, SpawnPosition, SpawnRotation, SpawnParameters);
+		Projectile->AttachToComponent(ProjectilesContainerComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		Projectile->SetOwner(this);
+		ProjectilesContainer.Insert(Projectile, ProjectilesContainer.Num());
 	}
 }
+
+bool AProjectileWeapon::HandleFire_Implementation()
+{
+	int Index = CurrentIndex;
+	bool bSuccess = !ProjectilesContainer.IsEmpty() && Super::HandleFire_Implementation();
+	if (!bSuccess)
+	{
+		return bSuccess;
+	}
+	else if (++Index >= ProjectilesContainer.Num())
+	{
+		Index = 0;
+	}
+
+	if (CurrentIndex != Index)
+	{
+		CurrentIndex = Index;
+	}
+
+	if (ProjectilesContainer.IsValidIndex(CurrentIndex) && IsValid(ProjectilesContainer[CurrentIndex]))
+	{
+		ProjectilesContainer[CurrentIndex]->Multicast_ProjectileOut(
+			IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
+			IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentRotation() : GetActorRotation());
+	}
+
+	return bSuccess;
+}
+
 
 void AProjectileWeapon::OnInteract_Implementation(AActor* Caller)
 {
@@ -48,25 +70,4 @@ void AProjectileWeapon::OnInteract_Implementation(AActor* Caller)
 			Projectile->SetOwner(GetOwner());
 		}
 	}
-}
-
-bool AProjectileWeapon::HandleFire_Implementation()
-{
-	const bool bSucces = Super::HandleFire_Implementation() && !ProjectilesContainer.IsEmpty();
-	if (!bSucces)
-	{
-		return bSucces;
-	}
-	else if (++CurrentIndex >= ProjectilesContainer.Num())
-	{
-		CurrentIndex = 0;
-	}
-
-	ABaseProjectile* Projectile = ProjectilesContainer[CurrentIndex];
-	Projectile->Execute_SetOriginalPositionAndRotation(Projectile, 
-		IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentLocation() : GetActorLocation(),
-		IsValid(MuzzleComponent) ? MuzzleComponent->GetComponentRotation() : GetActorRotation());
-	Projectile->Execute_OnTurnEnabled(Projectile, true);
-
-	return bSucces;
 }

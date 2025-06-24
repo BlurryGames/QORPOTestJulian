@@ -3,6 +3,8 @@
 ABaseItem::ABaseItem()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	SetReplicates(true);
+	SetReplicateMovement(true);
 
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(FName("RootComponent")));
 

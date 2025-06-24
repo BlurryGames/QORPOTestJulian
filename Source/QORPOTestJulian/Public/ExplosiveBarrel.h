@@ -44,6 +44,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Explosion")
 	TArray<AActor*> ExplosionOverlaps = TArray<AActor*>();
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Explosion")
+	FTimerHandle DissapearTimerHandle = FTimerHandle();
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion")
 	FRadialDamageEvent RadialDamageEvent = FRadialDamageEvent();
 
@@ -53,13 +56,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion", meta = (ClampMin = 0.0f, ClampMax = 100.0f))
 	float ImpulseMultiplier = 50.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion", meta = (ClampMin = 0.0f, ClampMax = 10.0f))
+	float DissapearTime = 4.0f;
+
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Explosion")
-	void HandleSystemFinished(UParticleSystemComponent* ParticleSystem);
-
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void HandleHealthChanged(const float HealthResult, const float TotalHealth);
+
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Explosion")
+	void Multicast_HandleDissapear();
 };

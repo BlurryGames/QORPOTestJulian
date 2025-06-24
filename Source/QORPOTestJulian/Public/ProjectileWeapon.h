@@ -31,7 +31,7 @@ protected:
 
 	virtual void BeginPlay() override;
 
-	virtual void OnInteract_Implementation(AActor* Caller) override;
-
 	virtual bool HandleFire_Implementation() override;
+
+	virtual void OnInteract_Implementation(AActor* Caller) override;
 };

@@ -83,8 +83,7 @@ void AShooterGameModeBase::ActivateRoundEnemies(TSubclassOf<ABaseEnemy> EnemyCla
             DesiredPosition.Z = SpawnableParameters.SpawnAltitude;
         }
 
-        Enemy->Execute_SetOriginalPosition(Enemy, DesiredPosition);
-        Enemy->Execute_OnTurnEnabled(Enemy, true);
+        Enemy->Multicast_Spawn(DesiredPosition);
         RoundEnemies.AddUnique(Enemy);
     }
 

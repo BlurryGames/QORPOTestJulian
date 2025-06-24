@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/BoxComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "InteractableInterface.h"
 #include "ReusableInterface.h"
 
@@ -29,7 +30,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
 	FVector OpenPositionOffset = FVector::ZeroVector;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
 	FVector DesiredPosition = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
@@ -38,7 +39,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
 	FRotator OpenRotationOffset = FRotator(0.0f, 90.0f, 0.0f);
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
 	FRotator DesiredRotation = FRotator::ZeroRotator;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", meta = (ClampMin = 0.0f, ClampMax = 1000.0f))
@@ -53,10 +54,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", meta = (ClampMin = 0.1f, ClampMax = 1.0f))
 	float RotationToleranceOffset = 0.1f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
 	bool bActiveAnimation = false;
 
 	virtual void BeginPlay() override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Tick(float DeltaTime) override;
 

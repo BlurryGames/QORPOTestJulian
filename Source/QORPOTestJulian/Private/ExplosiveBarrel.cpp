@@ -2,6 +2,9 @@
 
 AExplosiveBarrel::AExplosiveBarrel()
 {
+	SetReplicates(true);
+	SetReplicateMovement(true);
+
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetSimulatePhysics(true);
 	MeshComponent->SetCanEverAffectNavigation(false);
@@ -21,8 +24,9 @@ AExplosiveBarrel::AExplosiveBarrel()
 	CapsuleComponent->SetupAttachment(MeshComponent);
 
 	ParticleComponent = CreateDefaultSubobject<UParticleSystemComponent>(FName("ParticleComponent"));
+	ParticleComponent->SetIsReplicated(true);
 	ParticleComponent->SetAutoActivate(false);
-	ParticleComponent->bAllowRecycling = true;
+	ParticleComponent->bAllowRecycling = false;
 	ParticleComponent->SetupAttachment(MeshComponent);
 
 	AudioComponent = CreateDefaultSubobject<UAudioComponent>(FName("AudioComponent"));
@@ -91,11 +95,6 @@ void AExplosiveBarrel::BeginPlay()
 		RadialDamageEvent.Params = RadialDamageParameters;
 	}
 
-	if (IsValid(ParticleComponent))
-	{
-		ParticleComponent->OnSystemFinished.AddUniqueDynamic(this, &AExplosiveBarrel::HandleSystemFinished);
-	}
-
 	if (IsValid(AttributesComponent))
 	{
 		AttributesComponent->OnHealthChanged.AddUniqueDynamic(this, &AExplosiveBarrel::HandleHealthChanged);
@@ -106,15 +105,7 @@ void AExplosiveBarrel::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if (IsValid(ParticleComponent))
-	{
-		ParticleComponent->OnSystemFinished.RemoveAll(this);
-	}
-}
-
-void AExplosiveBarrel::HandleSystemFinished_Implementation(UParticleSystemComponent* ParticleSystem)
-{
-	Execute_OnTurnEnabled(this, false);
+	GetWorldTimerManager().ClearAllTimersForObject(this);
 }
 
 void AExplosiveBarrel::HandleHealthChanged(const float HealthResult, const float TotalHealth)
@@ -128,7 +119,16 @@ void AExplosiveBarrel::HandleHealthChanged(const float HealthResult, const float
 		AudioComponent->Play();
 	}
 
-	IsValid(ParticleComponent) && IsValid(ParticleComponent->Template) ? ParticleComponent->ActivateSystem(true) : Execute_OnTurnEnabled(this, false);
+	if (IsValid(ParticleComponent))
+	{
+		ParticleComponent->ActivateSystem(true);
+	}
+
+	if (HasAuthority())
+	{
+		GetWorldTimerManager().SetTimer(DissapearTimerHandle, this, &AExplosiveBarrel::Multicast_HandleDissapear, DissapearTime, false);
+	}
+
 	if (!IsValid(ExplosionSphereComponent))
 	{
 		return;
@@ -146,4 +146,9 @@ void AExplosiveBarrel::HandleHealthChanged(const float HealthResult, const float
 	}
 
 	ExplosionSphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void AExplosiveBarrel::Multicast_HandleDissapear_Implementation()
+{
+	Execute_OnTurnEnabled(this, false);
 }

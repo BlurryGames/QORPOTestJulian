@@ -1,9 +1,15 @@
 #include "BaseProjectile.h"
+#include "ShooterPlayerController.h"
 #include "BaseWeapon.h"
+#include "ExplosiveBarrel.h"
 
 ABaseProjectile::ABaseProjectile()
 {
+	SetReplicates(true);
+	SetReplicateMovement(true);
+
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName("MeshComponent"));
+	MeshComponent->SetIsReplicated(true);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	MeshComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
@@ -40,8 +46,11 @@ void ABaseProjectile::BeginPlay()
 	Super::BeginPlay();
 
 	Execute_AddEnabledType(this, MeshComponent);
-
 	Execute_OnTurnEnabled(this, false);
+	if (!HasAuthority() && IsValid(ProjectileMovementComponent))
+	{
+		ProjectileMovementComponent->Deactivate();
+	}
 }
 
 void ABaseProjectile::NotifyActorBeginOverlap(AActor* OtherActor)
@@ -66,11 +75,21 @@ void ABaseProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorldTimerManager().ClearTimer(LifeTimeHandle);
 }
 
+void ABaseProjectile::Multicast_ProjectileOut_Implementation(const FVector& Position, const FRotator& Rotation, const bool bEnable)
+{
+	Execute_SetOriginalPositionAndRotation(this, Position, Rotation);
+	Execute_OnTurnEnabled(this, bEnable);
+}
+
 void ABaseProjectile::OnTurnEnabled_Implementation(const bool bEnabled)
 {
 	IReusableInterface::OnTurnEnabled_Implementation(bEnabled);
 
-	if (IsValid(ProjectileMovementComponent))
+	if (!HasAuthority())
+	{
+		return;
+	}
+	else if (IsValid(ProjectileMovementComponent))
 	{
 		ProjectileMovementComponent->StopMovementImmediately();
 		ProjectileMovementComponent->SetVelocityInLocalSpace(FVector(ProjectileMovementComponent->InitialSpeed, 0.0f, 0.0f));
@@ -90,14 +109,11 @@ void ABaseProjectile::OnTurnEnabled_Implementation(const bool bEnabled)
 
 void ABaseProjectile::ImpactBody(AActor* Actor)
 {
-	if (Actor == GetOwner() || IsValid(Cast<ABaseProjectile>(Actor)) || IsValid(Cast<ABaseItem>(Actor)))
+	if (!HasAuthority() || Actor == GetOwner() || IsValid(Cast<ABaseProjectile>(Actor)) || IsValid(Cast<ABaseItem>(Actor)))
 	{
 		return;
 	}
-	else if (IsValid(Actor))
-	{
-		Actor->TakeDamage(Damage, FDamageEvent(), GetInstigatorController(), this);
-	}
-
-	Execute_OnTurnEnabled(this, false);
+	
+	Execute_DoDamage(this, Actor, Damage, FDamageEvent());
+	Multicast_ProjectileOut(GetActorLocation(), GetActorRotation(), false);
 }

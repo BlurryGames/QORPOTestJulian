@@ -49,6 +49,9 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Status")
 	void AddEnabledType(UPrimitiveComponent* PrimitiveComponent);
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+	void DoDamage(AActor* DamageReceiver, float DamageAmount, FDamageEvent const& DamageEvent);
+
 	virtual FVector GetOriginalPosition_Implementation();
 
 	virtual FRotator GetOriginalRotation_Implementation();
@@ -62,4 +65,6 @@ protected:
 	virtual void OnTurnEnabled_Implementation(const bool bEnabled = true);
 
 	virtual void AddEnabledType_Implementation(UPrimitiveComponent* PrimitiveComponent);
+
+	virtual void DoDamage_Implementation(AActor* DamageReceiver, float DamageAmount, FDamageEvent const& DamageEvent);
 };
